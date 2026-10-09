@@ -1,0 +1,39 @@
+# Configuration de Milo. Toutes les lignes sont facultatives :
+# supprimer une ligne revient à utiliser la valeur par défaut indiquée.
+
+# Raccourci pour parler à Milo : ctrl, alt, shift, win + une lettre, un chiffre,
+# space, pause, insert ou f1 à f12. (Ctrl+Alt+Espace est souvent déjà pris.)
+raccourci = "ctrl+alt+m"
+
+# Dossier du modèle de reconnaissance vocale (relatif à ce fichier ou absolu).
+modele = "models/vosk-model-small-fr-0.22"
+
+# Nom ou numéro du micro (voir « python -m milo --micros »). Vide = micro par défaut.
+micro = ""
+
+# Pas utilisé par « monte le son », « baisse la luminosité »… (en pour cent).
+pas = 10
+
+# Grammaire restreinte : bien plus fiable pour les commandes connues.
+# La reconnaissance libre reste toujours active en secours.
+grammaire = true
+
+# Au démarrage, si le volume est coupé ou sous ce niveau, Milo le remonte
+# (sinon une personne aveugle n'aurait aucun retour). 0 = désactivé.
+volume_minimum = 20
+
+# Fichier où sont enregistrés les modes (« travail », « soir »…).
+modes = "modes.json"
+
+# Adresse de recherche web, {} est remplacé par la recherche.
+recherche = "https://www.google.com/search?q={}"
+
+[voix]
+langue = "40C"   # code de langue SAPI : 40C = français (France)
+vitesse = 0      # de -10 (lent) à 10 (rapide)
+volume = 100     # de 0 à 100
+
+[ecoute]
+delai_max = 8.0      # durée maximale d'écoute, en secondes
+delai_silence = 4.0  # abandon si personne ne parle pendant ce délai
+pause_fin = 0.7      # silence qui marque la fin d'une commande (plus long = on peut hésiter)
