@@ -36,12 +36,28 @@ def _merge(base: dict, override: dict) -> dict:
     return merged
 
 
+def read_text(path: Path) -> str:
+    # utf-8-sig : le Bloc-notes ajoute parfois une marque BOM que tomllib et json refusent.
+    return path.read_text(encoding="utf-8-sig")
+
+
 def load_config(path: Path | None = None) -> dict:
+    """Réglages fusionnés avec les valeurs par défaut.
+
+    Un config.toml invalide ne doit pas empêcher Milo de démarrer : on prend les
+    valeurs par défaut et `config["avertissement"]` explique le problème à voix haute.
+    """
     path = path or BASE_DIR / "config.toml"
-    config = DEFAULTS
+    override, warning = {}, None
     if path.is_file():
-        with path.open("rb") as f:
-            config = _merge(DEFAULTS, tomllib.load(f))
+        try:
+            override = tomllib.loads(read_text(path))
+        except (tomllib.TOMLDecodeError, UnicodeDecodeError) as exc:
+            line = getattr(exc, "lineno", None)
+            where = f" à la ligne {line}" if line else ""
+            warning = f"Le fichier config point toml contient une erreur{where}. J'utilise les réglages par défaut."
+    config = _merge(DEFAULTS, override)
+    config["avertissement"] = warning
     for key in ("modele", "modes"):
         path = Path(config[key])
         config[key] = path if path.is_absolute() else BASE_DIR / path
@@ -53,13 +69,12 @@ def save_voice_rate(rate: int, path: Path | None = None) -> None:
     path = path or BASE_DIR / "config.toml"
     if not path.is_file():
         return
-    text = path.read_text(encoding="utf-8")
+    text = read_text(path)
     updated, count = re.subn(r"(?m)^(vitesse\s*=\s*)-?\d+", rf"\g<1>{rate}", text, count=1)
     if count:
         path.write_text(updated, encoding="utf-8")
 
 
 def load_commands() -> dict:
-    with (PACKAGE_DIR / "data" / "commandes.toml").open("rb") as f:
-        data = tomllib.load(f)
+    data = tomllib.loads(read_text(PACKAGE_DIR / "data" / "commandes.toml"))
     return {"parametres": data.get("parametres", {}), "applications": data.get("applications", {})}

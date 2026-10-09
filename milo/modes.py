@@ -12,6 +12,7 @@ import json
 import logging
 from pathlib import Path
 
+from .config import read_text
 from .text import best_match, normalize
 
 log = logging.getLogger(__name__)
@@ -27,9 +28,12 @@ class ModeStore:
         self.modes: dict[str, dict] = {}
         if path.is_file():
             try:
-                self.modes = json.loads(path.read_text(encoding="utf-8"))
+                self.modes = json.loads(read_text(path))
             except ValueError:
-                log.exception("modes.json illisible, il sera remplacé au prochain enregistrement")
+                # On met le fichier de côté plutôt que de l'écraser au prochain enregistrement.
+                backup = path.with_name(path.stem + ".illisible.json")
+                path.replace(backup)
+                log.exception("modes.json illisible, copié dans %s", backup)
 
     def _write(self) -> None:
         self.path.write_text(json.dumps(self.modes, ensure_ascii=False, indent=2), encoding="utf-8")

@@ -1,6 +1,7 @@
 """Point d'entrée : python -m milo [--commande TEXTE | --analyse TEXTE | --wav FICHIER | --micros]."""
 
 import argparse
+import ctypes
 import logging
 import os
 import queue
@@ -22,6 +23,8 @@ from .vocabulary import build_grammar
 
 log = logging.getLogger("milo")
 
+_ERROR_ALREADY_EXISTS = 183
+
 _SPOKEN_KEYS = {"ctrl": "Contrôle", "control": "Contrôle", "alt": "Alt", "shift": "Majuscule",
                 "maj": "Majuscule", "win": "Windows", "space": "Espace", "espace": "Espace"}
 
@@ -33,11 +36,25 @@ def spoken_hotkey(spec: str) -> str:
 def setup_logging() -> None:
     log_dir = Path(os.environ.get("LOCALAPPDATA", Path.home())) / "Milo"
     log_dir.mkdir(parents=True, exist_ok=True)
+    handlers = [logging.FileHandler(log_dir / "milo.log", encoding="utf-8")]
+    if sys.stderr:  # absent quand Milo est lancé par pythonw (démarrage automatique)
+        handlers.append(logging.StreamHandler())
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s : %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler(log_dir / "milo.log", encoding="utf-8")],
+        handlers=handlers,
     )
+
+
+def single_instance_lock():
+    """Verrou système ; None si un autre Milo tourne déjà (démarrage auto + lancement manuel)."""
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateMutexW.restype = ctypes.c_void_p
+    handle = kernel32.CreateMutexW(None, False, "Local\\Milo")
+    if ctypes.get_last_error() == _ERROR_ALREADY_EXISTS:
+        kernel32.CloseHandle(ctypes.c_void_p(handle))
+        return None
+    return handle
 
 
 def build_assistant(config: dict) -> Assistant:
@@ -77,6 +94,12 @@ def ensure_audible(minimum: int) -> str | None:
 
 def run(config: dict) -> int:
     speaker = Speaker(config["voix"]["langue"], config["voix"]["vitesse"], config["voix"]["volume"])
+    lock = single_instance_lock()  # gardé ouvert jusqu'à la fin du processus
+    if lock is None:
+        log.info("Milo tourne déjà, deuxième lancement ignoré")
+        speaker.say(f"Milo est déjà lancé. Appuyez sur {spoken_hotkey(config['raccourci'])} pour parler.", wait=True)
+        speaker.close()
+        return 0
     assistant = build_assistant(config)
     try:
         listener = build_listener(config, assistant)
@@ -131,9 +154,9 @@ def run(config: dict) -> int:
     spoken = spoken_hotkey(config["raccourci"])
 
     def on_ready() -> None:
-        warning = ensure_audible(config["volume_minimum"])
-        if warning:
-            speaker.say(warning)
+        for warning in (ensure_audible(config["volume_minimum"]), config.get("avertissement")):
+            if warning:
+                speaker.say(warning)
         speaker.say(f"Milo est prêt. Appuyez sur {spoken} pour parler.")
 
     try:
@@ -161,10 +184,23 @@ def main(argv=None) -> int:
     group.add_argument("--analyse", metavar="TEXTE", help="affiche l'intention reconnue, sans rien exécuter")
     group.add_argument("--wav", metavar="FICHIER", type=Path, help="transcrit un fichier WAV et affiche l'intention")
     group.add_argument("--micros", action="store_true", help="liste les micros disponibles")
+    group.add_argument("--installer-raccourcis", action="store_true",
+                       help="démarrage automatique à l'ouverture de session + entrée du menu Démarrer")
+    group.add_argument("--retirer-raccourcis", action="store_true", help="supprime ces raccourcis")
     args = parser.parse_args(argv)
 
-    if sys.stdout.encoding.lower() != "utf-8":
+    if sys.stdout and sys.stdout.encoding.lower() != "utf-8":
         sys.stdout.reconfigure(encoding="utf-8")
+
+    if args.installer_raccourcis or args.retirer_raccourcis:
+        from . import install
+        if args.installer_raccourcis:
+            for path in install.create_shortcuts():
+                print(f"Raccourci créé : {path}")
+        else:
+            removed = install.remove_shortcuts()
+            print("\n".join(f"Raccourci supprimé : {p}" for p in removed) or "Aucun raccourci à supprimer.")
+        return 0
 
     config = load_config()
 
@@ -185,8 +221,16 @@ def main(argv=None) -> int:
         return 0
 
     setup_logging()
+    if config["avertissement"]:
+        log.warning(config["avertissement"])
     if args.commande:
         response, _ = build_assistant(config).handle([args.commande])
         print(response)
         return 0
-    return run(config)
+    try:
+        return run(config)
+    except Exception:
+        # Lancé sans console (démarrage automatique), une erreur serait sinon silencieuse.
+        log.exception("Milo n'a pas pu démarrer")
+        Speaker().say("Milo n'a pas pu démarrer. Le détail est dans le journal de Milo.", wait=True)
+        return 1

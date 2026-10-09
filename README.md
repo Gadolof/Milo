@@ -51,21 +51,35 @@ Chaque clé est facultative : un mode n'applique que ce qu'il contient.
 }
 ```
 
-## Installation (Windows 10/11, Python 3.11 ou plus)
+## Installation (Windows 10/11)
 
-Toutes les commandes se lancent **depuis le dossier du projet** (celui qui contient ce README) :
+À faire une fois, de préférence par une personne voyante :
+
+1. Installer [Python](https://www.python.org/downloads/) 3.11 ou plus récent, en cochant **« Add python.exe to PATH »**.
+2. Télécharger Milo : sur GitHub, **Code → Download ZIP**, puis extraire le dossier (par exemple dans `Documents\Milo`).
+3. Double-cliquer sur **`installer.bat`**. L'installation se commente à voix haute et dure une à quelques minutes.
+
+C'est tout : Milo démarre aussitôt, puis **tout seul à chaque ouverture de session**, sans fenêtre.
+Il est aussi dans le menu Démarrer (taper « Milo »). Lancé deux fois, il le signale simplement.
+Pour arrêter : « au revoir Milo ». Pour ne plus le démarrer automatiquement : **`desinstaller.bat`**.
+
+`installer.bat --sans-demarrage` installe sans démarrage automatique ni entrée de menu.
+
+Installation manuelle, depuis le dossier du projet :
 
 ```bash
-cd chemin\vers\Milo
 python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 .venv\Scripts\python scripts\telecharger_modele.py
+.venv\Scripts\python -m milo --installer-raccourcis
 .venv\Scripts\python -m milo
 ```
 
 Réglages (raccourci, micro, vitesse de la voix, moteur de recherche…) : [`config.toml`](config.toml).
 Au démarrage, si le son est coupé ou sous 20 %, Milo le remonte et le dit : sans cela,
 une personne aveugle n'aurait aucun moyen de savoir qu'il fonctionne (`volume_minimum`).
+Si `config.toml` contient une erreur, Milo démarre quand même avec les réglages par défaut
+et l'annonce ; toute erreur de démarrage est dite à voix haute et détaillée dans le journal.
 
 ## Outils de test
 
@@ -108,6 +122,6 @@ libre. La correspondance des noms d'applications est volontairement stricte : mi
 - Mot d'éveil « Milo » (sans raccourci clavier), via openWakeWord.
 - Modes : fermer des applications, mode avion, « ne pas déranger », éclairage nocturne.
 - Activation automatique d'un mode à une heure donnée (« mode soir à 21 heures »).
-- Icône dans la zone de notification et démarrage avec Windows.
-- Exécutable autonome (PyInstaller) et installeur.
+- Icône dans la zone de notification.
+- Exécutable autonome (PyInstaller) pour se passer de l'installation de Python.
 - Réponses via NVDA quand il est actif, à la place de la voix SAPI.
